@@ -614,9 +614,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 card.classList.add("processing");
             }
 
-            if (action === "approve") {
-                openDrawer(incidentId);
-            }
+            openDrawer(incidentId, action);
 
             try {
                 const response = await fetch(`${BACKEND_URL}/v1/execute/${incidentId}/action`, {
@@ -629,59 +627,70 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 const data = await response.json();
 
                 if (action === "approve") {
-                    displayResult(data.pathology);
+                    displayResult(data.pathology, "Approved");
                 } else {
+                    displayResult(data.message, "Rejected");
                     if (card) card.remove();
-                    pollQueue();
                 }
             } catch (err) {
                 console.error("Action error:", err);
-                if (action === "approve") {
-                    displayError("Error retrieving pathology diagnosis. Please try again.");
-                }
+                displayError(action === "approve"
+                    ? "Error retrieving pathology diagnosis. Please try again."
+                    : "Error processing rejection request. Please try again."
+                );
                 if (card) {
                     card.classList.remove("processing");
                 }
             }
         }
 
-        function openDrawer(incidentId) {
+        function openDrawer(incidentId, action) {
             const drawer = document.getElementById("drawer");
             const drawerHeaderInfo = document.getElementById("drawer-header-info");
             const drawerBody = document.getElementById("drawer-body");
             const incident = pendingIncidents[incidentId];
 
+            const statusLabel = action === "approve" ? "Verifying Crop" : "Dismissing Incident";
+
             drawerHeaderInfo.innerHTML = `
                 <div class="drawer-header-content">
-                    <h3>Verifying Crop: ${incident.crop.toUpperCase()}</h3>
+                    <h3>${statusLabel}: ${incident.crop.toUpperCase()}</h3>
                     <p class="drawer-meta">Lat: ${incident.latitude.toFixed(4)} · Lon: ${incident.longitude.toFixed(4)} · Humidity: ${incident.humidity}</p>
                 </div>
             `;
 
+            const loadingText = action === "approve"
+                ? "Requesting pathology model analysis..."
+                : "Dismissing incident alert and marking queue...";
+
             drawerBody.innerHTML = `
                 <div class="drawer-loading">
                     <div class="spinner"></div>
-                    <p>Requesting pathology model analysis...</p>
+                    <p>${loadingText}</p>
                 </div>
             `;
             drawer.classList.add("open");
         }
 
-        function displayResult(pathologyResult) {
+        function displayResult(contentResult, actionStatus) {
             const drawerBody = document.getElementById("drawer-body");
             drawerBody.innerHTML = "";
 
-            const formattedResult = pathologyResult
+            const formattedResult = contentResult
                 .replace(/Diagnosis:/g, '<strong>Diagnosis:</strong>')
                 .replace(/Risk:/g, '<br><br><strong>Risk:</strong>')
                 .replace(/Recommendation:/g, '<br><br><strong>Recommendation:</strong>')
                 .replace(/Action:/g, '<br><br><strong>Action Required:</strong>');
 
+            const isRejected = actionStatus === "Rejected";
+
             const resultDiv = document.createElement("div");
             resultDiv.className = "drawer-result fadeIn";
             resultDiv.innerHTML = `
                 <div class="result-card">
-                    <div class="result-icon-badge">✓</div>
+                    <div class="result-icon-badge" style="background-color: ${isRejected ? 'rgba(255, 69, 58, 0.1)' : 'rgba(48, 209, 88, 0.1)'}; border-color: ${isRejected ? 'rgba(255, 69, 58, 0.2)' : 'rgba(48, 209, 88, 0.2)'}; color: ${isRejected ? '#ff453a' : '#30d158'};">
+                        ${isRejected ? '✕' : '✓'}
+                    </div>
                     <p class="result-text">${formattedResult}</p>
                 </div>
             `;
