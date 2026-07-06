@@ -11,10 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 
 app = FastAPI(title="AgriShield Manager Dashboard", version="1.0.0")
+
+BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8080")
 
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -710,4 +714,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
 @app.get("/", response_class=HTMLResponse)
 def get_dashboard():
-    return DASHBOARD_HTML
+    # Dynamically inject the BACKEND_URL environment variable value into the JavaScript context
+    html_content = DASHBOARD_HTML.replace(
+        'const BACKEND_URL = "http://127.0.0.1:8080";',
+        f'const BACKEND_URL = "{BACKEND_URL}";',
+    )
+    return html_content
